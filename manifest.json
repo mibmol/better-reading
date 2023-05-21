@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Bold Half Extension",
-  "version": "1.0",
-  "description": "Make half of every word bold.",
-  "permissions": ["storage", "tabs", "scripting"],
+  "name": "Better Reading",
+  "version": "0.2",
+  "description": "Improve reading speed dramatically with this method. Excellent for people with ADHD.",
+  "permissions": ["storage", "activeTab"],
   "action": {
     "default_popup": "popup.html"
   },
@@ -12,10 +12,6 @@
     "19": "icons/icon19.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
-  },
-  "host_permissions": ["<all_urls>"],
-  "background": {
-    "service_worker": "background.js"
   },
   "content_scripts": [
     {

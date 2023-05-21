@@ -4,40 +4,18 @@ const Color = {
   gray: "#6b7280",
 }
 
-
-async function initializeForm() {
-  const { activated } = await chrome.storage.sync.get()
-  document.getElementById("switchIcon").style.stroke = activated ? Color.lavender : Color.gray;
-  // document.getElementById("applyToButtons").checked = applyToButtons;
-}
-
 async function getCurrentTabHostname() {
   const [currentTab] = await chrome.tabs.query({ active: true, currentWindow: true })
   return new URL(currentTab?.url).hostname
-
 }
 
-async function sendUpdateSetting(key, value) {
-  const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
-  for (const { id: tabId } of tabs) {
-    chrome.tabs.sendMessage(tabId, {
-      action: "UpdateSetting",
-      setting: { key, value }
-    })
-  }
-}
-
-async function setCurrentUrl() {
-  const hostname = await getCurrentTabHostname()
-  document.getElementById("currentWebsite").textContent = hostname
-
-}
 
 async function isHostActivated() {
   const [settings, hostname] = await Promise.all([
-    chrome.storage.sync.get(["deactivatedHosts"]),
+    chrome.storage.sync.get(),
     getCurrentTabHostname()
   ])
+
   const deactivatedHosts = settings.deactivatedHosts ?? []
 
   return {
@@ -47,26 +25,43 @@ async function isHostActivated() {
   }
 }
 
+async function initializeForm() {
+  const { activated } = await isHostActivated()
+  document.getElementById("switchIcon").style.stroke = activated ? Color.lavender : Color.gray;
+}
+
+
+
+async function sendUpdateSetting(key, value) {
+  const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true })
+  chrome.tabs.sendMessage(activeTab.id, {
+    action: "UpdateSetting",
+    setting: { key, value }
+  })
+
+}
+
+async function setCurrentUrl() {
+  const hostname = await getCurrentTabHostname()
+  document.getElementById("currentWebsite").textContent = hostname
+}
+
+
+
 document.addEventListener("DOMContentLoaded", () => {
   const activateButton = document.getElementById("activateButton");
 
   activateButton.addEventListener("click", async () => {
 
     const { activated, deactivatedHosts, hostname } = await isHostActivated()
-
     if (activated) {
-      sendUpdateSetting("deactivatedHosts", deactivatedHosts.filter(host => host === hostname))
+      sendUpdateSetting("deactivatedHosts", [...deactivatedHosts, hostname])
     } else {
-      deactivatedHosts.push(hostname)
-      sendUpdateSetting("deactivatedHosts", deactivatedHosts)
+      sendUpdateSetting("deactivatedHosts", deactivatedHosts.filter(host => host !== hostname))
     }
-    document.getElementById("switchIcon").style.stroke = activated ? Color.lavender : Color.gray
-  });
 
-  // const applyToButtons = document.getElementById("applyToButtons");
-  // applyToButtons.addEventListener("change", () => {
-  //   sendUpdateSetting("applyToButtons", applyToButtons.checked)
-  // })
+    document.getElementById("switchIcon").style.stroke = !activated ? Color.lavender : Color.gray
+  });
 
   initializeForm()
   setCurrentUrl()

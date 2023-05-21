@@ -1,4 +1,5 @@
-const actionElements = ["BUTTON", "A"]
+const excludeElements = ["BUTTON", "A", "SVG", "STYLE", "SCRIPT"]
+let nodesReady = false
 
 function getSplitIndex(wordLength = 0) {
   if (wordLength <= 3) {
@@ -19,20 +20,14 @@ function addSpanNodeToWords(sentence) {
   });
 }
 
-async function prepareNodes() {
+function prepareNodes() {
   const docWalker = document.createTreeWalker(
     document.body,
     NodeFilter.SHOW_TEXT,
     {
-      acceptNode: (node) => {
-        // if (!node.parentNode) return NodeFilter.FILTER_REJECT;
-        // if (actionElements.includes(node.parentNode.nodeName)) {
-        //   return NodeFilter.FILTER_REJECT
-        // }
-        return NodeFilter.FILTER_ACCEPT
-      }
-    },
-    false
+      acceptNode: (node) => excludeElements.includes(node.parentNode?.nodeName) ? NodeFilter.FILTER_SKIP : NodeFilter.FILTER_ACCEPT
+
+    }
   );
   const nodes = [];
   let currentNode
@@ -52,28 +47,59 @@ async function prepareNodes() {
   }
 }
 
+async function isActivated(deactivatedHosts = []) {
+  const currentHost = window.location.hostname
+  return !deactivatedHosts.find(host => host === currentHost)
+}
+
 async function applySetting() {
-  const { activated } = await chrome.storage.sync.get()
-  activated ?
-    document.querySelectorAll(".better-reading-element").forEach((node) => {
+  const { deactivatedHosts } = await chrome.storage.sync.get()
+  const activated = await isActivated(deactivatedHosts)
+
+  document.querySelectorAll(".better-reading-element").forEach((node) => {
+    if (activated) {
       const fontWeight = window.getComputedStyle(node).getPropertyValue('font-weight')
       if (fontWeight !== "bold" && Number.parseInt(fontWeight) < 600) {
         node.classList.add("better-reading-boldword")
       }
-    })
-    : document.querySelectorAll(".better-reading-element").forEach((node) => {
+    } else {
       node.classList.remove("better-reading-boldword")
-    })
+    }
+  })
+
 }
 
-; (() => {
-  chrome.runtime.onMessage.addListener(async (request) => {
-    if (request.action === "UpdateSetting") {
-      const { key, value } = request.setting
-      await chrome.storage.sync.set({ [key]: value });
-      applySetting()
+
+chrome.runtime.onMessage.addListener(async (request) => {
+  if (request.action === "UpdateSetting") {
+    const { key, value } = request.setting
+    await chrome.storage.sync.set({ [key]: value });
+    if (!nodesReady) {
+      prepareNodes()
+      nodesReady = true
     }
-  });
-  prepareNodes()
-  applySetting()
-})()
+    applySetting()
+  }
+});
+
+function appendStyles() {
+  const style = document.createElement('style');
+  style.innerHTML = '.better-reading-boldword { font-weight: 600; }';
+  document.head.appendChild(style)
+}
+
+
+async function init() {
+  appendStyles()
+  const { deactivatedHosts } = chrome.storage.sync.get()
+  const activated = await isActivated(deactivatedHosts)
+  if (activated) {
+    prepareNodes()
+    nodesReady = true
+    applySetting()
+  }
+}
+
+init()
+
+
